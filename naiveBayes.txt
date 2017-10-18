@@ -1,0 +1,160 @@
+import random
+import math
+
+def load(filename):
+    fr = open(filename,'r')
+    lines = fr.readlines()
+    dataset=[]
+    for line in lines:
+        line = line.strip()
+        line = line.split(',')
+        dataset.append(line)
+    for i in range(len(dataset)):
+        dataset[i] = [float(x) for x in dataset[i]]
+    return dataset
+
+#以给定比例将数据集划分
+def splitDataset(dataset,splitRatio):
+    trainSize = int(len(dataset)*splitRatio)
+    trainSet = []
+    copy = list(dataset)
+    while len(trainSet)<trainSize:
+        index = random.randrange(len(copy))
+        trainSet.append(copy.pop(index))
+    return [trainSet,copy]
+
+#按类别划分数据
+def separateByClass(dataset):
+    separated = {}
+    for i in range(len(dataset)):
+        vector = dataset[i]
+        if (vector[-1] not in separated):
+            #创建类别的值列表
+            separated[vector[-1]] = []
+        #往值列表中添加对应的记录    
+        separated[vector[-1]].append(vector)
+    #得到的数据结构如：{0:[[2,21,0],[3,22,0]],1:[[1,20,1],[3,22,1]]}    
+    return separated
+
+def mean(numbers):
+    return sum(numbers)/float(len(numbers))
+
+#计算标准差
+def stdev(numbers):
+    avg = mean(numbers)
+    variance = sum([pow(x-avg,2) for x in numbers])/float(len(numbers)-1)
+    return math.sqrt(variance)
+
+#提取数据集的特征
+#zip函数将数据样本按照属性分组为一个个列表
+def summarize(dataset):
+    #行列互换 zip(*dataset)
+    summaries = [(mean(attribute),stdev(attribute)) for attribute in zip(*dataset)]
+    #删除类别组的均值和标准差
+    del summaries[-1]
+    #得到的数据结构如[(属性1均值，属性1标准差），（属性2均值，属性2标准差）...]
+    return summaries
+
+#合并代码，将训练数据集按类别进行划分，并计算每个属性的摘要
+def summarizeByClass(dataset):
+    separated = separateByClass(dataset)
+    summaries = {}
+    for classValue, instances in separated.items():
+        summaries[classValue] = summarize(instances)
+    #数据结构如：{类别1:[(属性1均值，属性1标准差）,（属性2均值，属性2标准差）...],类别2:[(属性2均值，属性2标准差)...]}
+    return summaries
+
+#???计算高斯概率密度函数！！！
+def calculateProbability(x,mean,stdev):
+    exponent = math.exp(-(math.pow(x-mean,2)/(2*math.pow(stdev,2))))
+    return (1/(math.sqrt(2*math.pi)*stdev))*exponent
+
+#使用乘法合并概率：给定一个数据样本，它所属每个类别的概率，可以通过其属性概率相乘得到。
+#结果是一个类值到概率的映射，如{0:0.000345,1:0.000287}
+#inputVector为输入的测试样本
+def calculateClassProbabilities(summaries, inputVector):
+    probabilities = {}
+    for classValue,classSummaries in summaries.items():
+        probabilities[classValue] = 1
+        for i in range(len(classSummaries)):
+            mean, stdev = classSummaries[i]
+            x = inputVector[i]
+            probabilities[classValue] *= calculateProbability(x, mean, stdev)
+    return probabilities
+
+#单一预测：调用上一函数，返回最大概率值关联的类
+def predict(summaries,inputVector):
+    probabilities = calculateClassProbabilities(summaries, inputVector)
+    bestLabel, bestProb = None, -1
+    for classValue,probability in probabilities.items():
+        if bestLabel is None or probability > bestProb:
+            bestProb = probability
+            bestLabel = classValue
+    return bestLabel
+
+#对测试数据集中的每个数据样本进行预测并返回测试样本的预测列表
+def getPredictions(summaries,testSet):
+    predictions = []
+    for i in range(len(testSet)):
+        result = predict(summaries,testSet[i])
+        predictions.append(result)
+    #得到的数据结构如['A','A','B','A']
+    return predictions
+
+#计算精度
+def getAccuracy(testSet, predictions):
+    correct = 0
+    for i in range(len(testSet)):
+        if testSet[i][-1] == predictions[i]:
+            correct += 1
+    return (correct/float(len(testSet)))*100.0
+
+#执行代码！！！
+def main():
+    filename = 'e:\gitpython\pima-indians-diabetes.data.txt'
+    splitRatio = 0.67
+    dataset = load(filename)
+    trainingSet, testSet = splitDataset(dataset, splitRatio)
+    print (('Split {0} rows into train={1} and test={2} rows').format(len(dataset),len(trainingSet),len(testSet)))
+    #prepare model
+    summaries = summarizeByClass(trainingSet)
+    #test model
+    predictions = getPredictions(summaries,testSet)
+    accuracy = getAccuracy(testSet,predictions)
+    print(('Accuracy:{0}%').format(accuracy))
+
+main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+    
+
+    
+
+    
